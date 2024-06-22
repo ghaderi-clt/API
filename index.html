@@ -6,11 +6,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>لیست محصولات</title>
     <style>
-        @font-face {
-            font-family: 'IRANSans';
-            src: url('path/to/IRANSans.woff') format('woff');
-        }
-
         body {
             font-family: 'IRANSans', Arial, sans-serif;
             background-color: #f4f4f4;
@@ -64,12 +59,114 @@
             margin-bottom: 10px;
         }
 
-        .product-description,
         .product-category,
         .product-rating {
             color: #666;
             font-size: 0.9em;
             text-align: center;
+        }
+
+        .product-buttons {
+            margin-top: 10px;
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
+        }
+
+        .product-buttons button {
+            background-color: #007BFF;
+            color: #fff;
+            border: none;
+            padding: 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.9em;
+        }
+
+        .product-buttons button.delete {
+            background-color: #dc3545;
+        }
+
+        .popup {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            justify-content: center;
+            align-items: center;
+        }
+
+        .popup-content {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 5px;
+            width: 90%;
+            max-width: 500px;
+        }
+
+        .popup-content input,
+        .popup-content textarea {
+            width: calc(100% - 20px);
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+            font-size: 1em;
+        }
+
+        .popup-content button {
+            background-color: #007BFF;
+            color: #fff;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 1em;
+        }
+
+        .popup-content button.close {
+            background-color: #dc3545;
+        }
+
+        .loading {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 2em;
+            color: #007BFF;
+        }
+
+        .new-product-form {
+            margin-bottom: 20px;
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 5px;
+        }
+
+        .new-product-form input,
+        .new-product-form textarea {
+            width: calc(100% - 20px);
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+            font-size: 1em;
+        }
+
+        .new-product-form button {
+            background-color: #007BFF;
+            color: #fff;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 1em;
         }
     </style>
 </head>
@@ -77,35 +174,177 @@
 <body>
 
     <h1>لیست محصولات</h1>
+
+    <div class="new-product-form">
+        <h2>تعریف محصول جدید</h2>
+        <form id="newProductForm">
+            <input type="text" id="newTitle" placeholder="عنوان" required>
+            <input type="number" id="newPrice" placeholder="قیمت" required>
+            <textarea id="newDescription" placeholder="توضیحات" required></textarea>
+            <input type="text" id="newCategory" placeholder="دسته‌بندی" required>
+            <input type="text" id="newImage" placeholder="تصویر URL" required>
+            <button type="submit">اضافه کردن محصول</button>
+        </form>
+    </div>
+
     <div class="products" id="products"></div>
 
+    <!-- پاپ‌آپ ویرایش محصول -->
+    <div class="popup" id="editPopup">
+        <div class="popup-content">
+            <h2>ویرایش محصول</h2>
+            <form id="editProductForm">
+                <input type="hidden" id="editId">
+                <input type="text" id="editTitle" placeholder="عنوان" required>
+                <input type="number" id="editPrice" placeholder="قیمت" required>
+                <textarea id="editDescription" placeholder="توضیحات" required></textarea>
+                <input type="text" id="editCategory" placeholder="دسته‌بندی" required>
+                <input type="text" id="editImage" placeholder="تصویر URL" required>
+                <button type="submit">به‌روزرسانی محصول</button>
+                <button type="button" class="close" onclick="closePopup()">بستن</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- لودینگ -->
+    <div class="loading" id="loading">در حال بارگذاری...</div>
+
     <script>
+        const apiUrl = 'https://beautynani.com/wp-json/wc/v3/products';
+        const consumerKey = 'ck_bb294b831c0039a8a57c2f8058f00ed389ad72fb';
+        const consumerSecret = 'cs_1fc1a20d24a8b235375a2aa01c9d564956823552';
+
         document.addEventListener('DOMContentLoaded', function () {
-            fetch('https://beautynani.com/wp-json/wc/v3/products', {
-                headers: {
-                    'Authorization': 'Basic ' + btoa('ck_bb294b831c0039a8a57c2f8058f00ed389ad72fb:cs_1fc1a20d24a8b235375a2aa01c9d564956823552')
-                }
-            })
-                .then(response => response.json())
-                .then(products => {
-                    const productsContainer = document.getElementById('products');
-                    products.forEach(product => {
-                        const productElement = document.createElement('div');
-                        productElement.className = 'product';
-                        productElement.innerHTML = `
-                        <img src="${product.images.length > 0 ? product.images[0].src : 'placeholder.jpg'}" alt="${product.name}">
-                        <div class="product-details">
-                            <div class="product-title">${product.name}</div>
-                            <div class="product-price">${product.price} دلار</div>
-                            <div class="product-category">دسته‌بندی: ${product.categories.map(cat => cat.name).join(', ')}</div>
-                            <div class="product-rating">امتیاز: ${product.average_rating} (${product.rating_count} نظر)</div>
-                        </div>
-                    `;
-                        productsContainer.appendChild(productElement);
-                    });
-                })
-                .catch(error => console.error('Error fetching products:', error));
+            fetchProducts();
         });
+
+        async function fetchProducts() {
+            showLoading();
+            const response = await fetch(`${apiUrl}?consumer_key=${consumerKey}&consumer_secret=${consumerSecret}`);
+            const products = await response.json();
+            displayProducts(products);
+            hideLoading();
+        }
+
+        function displayProducts(products) {
+            const productsContainer = document.getElementById('products');
+            productsContainer.innerHTML = '';
+            products.forEach(product => {
+                const productElement = document.createElement('div');
+                productElement.className = 'product';
+                productElement.innerHTML = `
+                <img src="${product.images[0].src}" alt="${product.name}">
+                <div class="product-details">
+                    <div class="product-title">${product.name}</div>
+                    <div class="product-price">${product.price} دلار</div>
+                    <div class="product-category">دسته‌بندی: ${product.categories[0].name}</div>
+                    <div class="product-rating">امتیاز: ${product.average_rating} (${product.rating_count} نظر)</div>
+                </div>
+                <div class="product-buttons">
+                    <button onclick="openEditPopup(${product.id}, '${product.name}', '${product.price}', '${product.description}', '${product.categories[0].name}', '${product.images[0].src}')">ویرایش</button>
+                    <button class="delete" onclick="deleteProduct(${product.id})">حذف</button>
+                </div>
+            `;
+                productsContainer.appendChild(productElement);
+            });
+        }
+
+        function openEditPopup(id, title, price, description, category, image) {
+            document.getElementById('editId').value = id;
+            document.getElementById('editTitle').value = title;
+            document.getElementById('editPrice').value = price;
+            document.getElementById('editDescription').value = description;
+            document.getElementById('editCategory').value = category;
+            document.getElementById('editImage').value = image;
+
+            document.getElementById('editPopup').style.display = 'flex';
+        }
+
+        function closePopup() {
+            document.getElementById('editPopup').style.display = 'none';
+        }
+
+        async function updateProduct(event) {
+            event.preventDefault();
+            showLoading();
+            const id = document.getElementById('editId').value;
+            const title = document.getElementById('editTitle').value;
+            const price = document.getElementById('editPrice').value;
+            const description = document.getElementById('editDescription').value;
+            const category = document.getElementById('editCategory').value;
+            const image = document.getElementById('editImage').value;
+
+            const data = {
+                name: title,
+                price: price,
+                description: description,
+                categories: [{ name: category }],
+                images: [{ src: image }]
+            };
+
+            await fetch(`${apiUrl}/${id}?consumer_key=${consumerKey}&consumer_secret=${consumerSecret}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(data)
+            });
+
+            closePopup();
+            hideLoading();
+            fetchProducts();
+        }
+
+        async function deleteProduct(id) {
+            showLoading();
+            await fetch(`${apiUrl}/${id}?consumer_key=${consumerKey}&consumer_secret=${consumerSecret}`, {
+                method: 'DELETE'
+            });
+            hideLoading();
+            fetchProducts();
+        }
+
+        document.getElementById('editProductForm').addEventListener('submit', updateProduct);
+
+        async function addProduct(event) {
+            event.preventDefault();
+            showLoading();
+            const title = document.getElementById('newTitle').value;
+            const price = document.getElementById('newPrice').value;
+            const description = document.getElementById('newDescription').value;
+            const category = document.getElementById('newCategory').value;
+            const image = document.getElementById('newImage').value;
+
+            const data = {
+                name: title,
+                price: price,
+                description: description,
+                categories: [{ name: category }],
+                images: [{ src: image }]
+            };
+
+            await fetch(`${apiUrl}?consumer_key=${consumerKey}&consumer_secret=${consumerSecret}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(data)
+            });
+
+            hideLoading();
+            document.getElementById('newProductForm').reset();
+            fetchProducts();
+        }
+
+        document.getElementById('newProductForm').addEventListener('submit', addProduct);
+
+        function showLoading() {
+            document.getElementById('loading').style.display = 'block';
+        }
+
+        function hideLoading() {
+            document.getElementById('loading').style.display = 'none';
+        }
     </script>
 
 </body>
