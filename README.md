@@ -1,1 +1,1 @@
-<img sre="https://github.com/yaserghaderi/API-privait/blob/main/Screenshot.jpg" >
+GitHub Pages   https://yaserghaderi.github.io/API-privait/
